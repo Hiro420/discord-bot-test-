@@ -1,26 +1,28 @@
-const Discord = require("discord.js")
-const client = new Discord.Client()
-const eventsPath = path.join(__dirname, 'events');
-const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+const { Client, Intents, Collection } = require("discord.js");
+const fs = require("fs");
 
-for (const file of eventFiles) {
-	const filePath = path.join(eventsPath, file);
-	const event = require(filePath);
-	if (event.once) {
-		client.once(event.name, (...args) => event.execute(...args));
-	} else {
-		client.on(event.name, (...args) => event.execute(...args));
-	}
+const client = new Client({
+  intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_MEMBERS, Intents.FLAGS.GUILD_BANS, Intents.FLAGS.DIRECT_MESSAGES, Intents.FLAGS.GUILD_PRESENCES]
+});
+const config = require("./config.json");
+// We also need to make sure we're attaching the config to the CLIENT so it's accessible everywhere!
+client.config = config;
+client.commands = new Collection();
+
+const events = fs.readdirSync("./events").filter(file => file.endsWith(".js"));
+for (const file of events) {
+  const eventName = file.split(".")[0];
+  const event = require(`./events/${file}`);
+  client.on(eventName, event.bind(null, client));
 }
 
-client.on("ready", () => {
-  console.log(`Logged in as ${client.user.tag}!`)
-})
+const commands = fs.readdirSync("./command-handling/commands").filter(file => file.endsWith(".js"));
+for (const file of commands) {
+  const commandName = file.split(".")[0];
+  const command = require(`./command-handling/commands/${file}`);
 
-client.on("message", msg => {
-  if (msg.content === "ping") {
-    msg.reply("pong");
-  }
-})
+  console.log(`Attempting to load command ${commandName}`);
+  client.commands.set(commandName, command);
+}
 
-client.login(process.env.TOKEN)
+client.login(config.token);
